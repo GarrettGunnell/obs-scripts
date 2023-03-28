@@ -9,6 +9,7 @@ from ctypes.util import find_library
 pngtuber_source = None
 idle_image_path = None
 talking_image_path = None
+audio_threshold = 0
 audio_volume = -999.999
 
 
@@ -151,7 +152,7 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber_source, idle_image_path, talking_image_path
+    global pngtuber_source, idle_image_path, talking_image_path, audio_threshold
 
     if G.lock:
         remove_volmeter()
@@ -160,6 +161,7 @@ def script_update(settings):
     pngtuber_source = obs.obs_data_get_string(settings, "png source")
     idle_image_path = obs.obs_data_get_string(settings, "idle image path")
     talking_image_path = obs.obs_data_get_string(settings, "talking image path")
+    audio_threshold = obs.obs_data_get_double(settings, "talking threshold")
 
 
 # Update (Called once per frame)
@@ -179,7 +181,26 @@ def script_tick(seconds):
         G.callback(G.noise)
         G.tick_acc = 0
 
-    #print(audio_volume)
+    if (float(audio_volume) > audio_threshold):
+        source = obs.obs_get_source_by_name(pngtuber_source)
+        settings = obs.obs_source_get_settings(source)
+        obs.obs_data_set_string(settings, "file", talking_image_path)
+        obs.obs_source_update(source, settings);
+
+        obs.obs_data_release(settings)
+        obs.obs_source_release(source)
+    else:
+        source = obs.obs_get_source_by_name(pngtuber_source)
+        settings = obs.obs_source_get_settings(source)
+        obs.obs_data_set_string(settings, "file", idle_image_path)
+        obs.obs_source_update(source, settings);
+
+        obs.obs_data_release(settings)
+        obs.obs_source_release(source)
+
+    #print(float(audio_volume), audio_threshold, audio_volume > audio_threshold)
+
+
 
 def script_unload():
     remove_volmeter()
