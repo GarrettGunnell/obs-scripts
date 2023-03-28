@@ -4,7 +4,7 @@ import obspython as obs
 def script_description():
   return """
 PNGTuber Animator
-by @Acerola_t
+    by @Acerola_t
 
 Change your PNGTuber source based on any number of sound gates.
 """
