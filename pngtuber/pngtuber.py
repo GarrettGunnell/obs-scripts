@@ -75,4 +75,13 @@ def script_tick(seconds):
 
 # Debug Button
 def debug_output(props, prop):
-    print(idle_image_path)
+    if not pngtuber_source:
+        print("Select your PNGTuber source")
+
+    source = obs.obs_get_source_by_name(pngtuber_source)
+    settings = obs.obs_source_get_settings(source)
+    obs.obs_data_set_string(settings, "file", idle_image_path)
+    obs.obs_source_update(source, settings);
+
+    obs.obs_data_release(settings)
+    obs.obs_source_release(source)
