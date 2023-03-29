@@ -3,8 +3,8 @@ from types import SimpleNamespace
 from ctypes import *
 from ctypes.util import find_library
 
-DEBUG = True
-DEBUG_AUDIO = True
+DEBUG = False
+DEBUG_AUDIO = False
 
 
 # Classes
@@ -74,6 +74,7 @@ class PNGTuber:
         else: self.idle()
 
     def release(self):
+        self.idle()
         obs.obs_data_release(self.settings)
         obs.obs_source_release(self.source)
 
@@ -156,7 +157,7 @@ Change your PNGTuber source based on up to two sound gates.
 
 # Set Default Values
 def script_defaults(settings):
-    pass
+    obs.obs_data_set_default_double(settings, "poll rate", 0.03)
 
 
 # UI
