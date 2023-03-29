@@ -15,7 +15,7 @@ class Volmeter(Structure):
     pass
 
 class PNGTuber:
-    isIdle = True
+    isIdle = False
     isTalking = False
     isYelling = False
 
@@ -110,8 +110,9 @@ def remove_volmeter():
 
 def write_volume(volume):
     global audio_volume
-    if DEBUG_AUDIO: print(volume)
     audio_volume = volume
+    if audio_volume == 999: audio_volume = -999
+    if DEBUG_AUDIO: print(audio_volume)
 
 OBS_FADER_LOG = 2
 G.lock = False
@@ -176,7 +177,7 @@ def script_properties():
     if sources is not None:
         for source in sources:
             source_id = obs.obs_source_get_unversioned_id(source)
-            if source_id == "wasapi_input_capture":
+            if source_id == "wasapi_input_capture" or source_id == "wasapi_output_capture":
                 name = obs.obs_source_get_name(source)
                 obs.obs_property_list_add_string(audio_sources_list, name, name)
 
