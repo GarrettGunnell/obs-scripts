@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from ctypes import *
 from ctypes.util import find_library
 
+DEBUG = True
+
 
 # Classes
 class Source(Structure):
@@ -14,21 +16,26 @@ class Volmeter(Structure):
 class PNGTuber:
     isIdle = True
     isTalking = False
+    isYelling = False
 
-    def __init__(self, source, talk_image, talk_threshold):
+    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
 
         self.idle_image = obs.obs_data_get_string(self.settings, "file")
         self.talking_image = talk_image
         self.talking_threshold = talk_threshold
+        self.yelling_image = yell_image
+        self.yelling_threshold = yell_threshold
 
     def idle(self):
         if self.isIdle:
             return
         
+        if DEBUG: print("Idle")
         self.isIdle = True
         self.isTalking = False
+        self.isYelling = False
         obs.obs_data_set_string(self.settings, "file", self.idle_image)
         obs.obs_source_update(self.source, self.settings);
 
@@ -36,16 +43,29 @@ class PNGTuber:
         if self.isTalking:
             return
         
+        if DEBUG: print("Talking")
         self.isIdle = False
         self.isTalking = True
+        self.isYelling = False
         obs.obs_data_set_string(self.settings, "file", self.talking_image)
         obs.obs_source_update(self.source, self.settings);
+    
+    def yelling(self):
+        if self.isYelling:
+            return
+        
+        if DEBUG: print("Yelling")
+        self.isIdle = False
+        self.isTalking = False
+        self.isYelling = True
+        obs.obs_data_set_string(self.settings, "file", self.yelling_image)
+        obs.obs_source_update(self.source, self.settings);
+
 
     def update(self, volume):
-        if (volume > self.talking_threshold):
-            self.talking()
-        else:
-            self.idle()
+        if   (volume > self.yelling_threshold): self.yelling()
+        elif (volume > self.talking_threshold): self.talking()
+        else: self.idle()
 
     def release(self):
         obs.obs_data_release(self.settings)
@@ -116,16 +136,15 @@ def poll_audio():
 audio_volume = -999.999
 audio_source = None
 pngtuber = None
-DEBUG = False
 
 # Description displayed in the Scripts dialog window
 def script_description():
   return \
 """
-PNGTuber Animator
+PNGTuber State Machine
     by @Acerola_t
 
-Change your PNGTuber source based on any number of sound gates.
+Change your PNGTuber source based on up to two sound gates.
 """
 
 # Set Default Values
@@ -175,8 +194,15 @@ def script_properties():
 
     obs.obs_properties_add_path(properties, "talking image path", "Talking Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
 
+    ygate = obs.obs_properties_add_bool(properties, "use yell gate", "Use Yell Gate?")
+    obs.obs_property_set_long_description(ygate, "Use this gate to transition to a different sprite when input volume exceeds the following threshold")
+
+    obs.obs_properties_add_float_slider(properties, "yelling threshold", "Yelling Threshold", -60.0, 0.0, 0.01)
+
+    obs.obs_properties_add_path(properties, "yelling image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
+
     if DEBUG:
-        obs.obs_properties_add_button(properties, "talking button", "Debug", debug)
+        obs.obs_properties_add_button(properties, "debug button", "Debug", debug)
 
     return properties
 
@@ -201,7 +227,10 @@ def script_update(settings):
 
     pngtuber_source = obs.obs_data_get_string(settings, "png source")
     talking_image_path = obs.obs_data_get_string(settings, "talking image path")
-    audio_threshold = obs.obs_data_get_double(settings, "talking threshold")
+    talking_threshold = obs.obs_data_get_double(settings, "talking threshold")
+    use_yelling = obs.obs_data_get_bool(settings, "use yell gate")
+    yelling_image_path = obs.obs_data_get_string(settings, "yelling image path") if use_yelling else talking_image_path
+    yelling_threshold = obs.obs_data_get_double(settings, "yelling threshold")
 
     if pngtuber_source is None:
         print("Please select your PNGTuber source.")
@@ -211,7 +240,11 @@ def script_update(settings):
         print("Please select an image for talking.")
         return
     
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source),talking_image_path, audio_threshold)
+    if use_yelling and yelling_image_path == "":
+        print("Please select an image for talking.")
+        return
+    
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold)
 
 
 # Update (Called once per frame)
@@ -228,7 +261,7 @@ def script_tick(seconds):
         pngtuber.update(audio_volume)
 
 
-
+# Release memory
 def script_unload():
     if G.lock:
         remove_volmeter()
@@ -238,21 +271,6 @@ def script_unload():
 
     if audio_source is not None:
         obs.obs_source_release(audio_source)
-    
-
-
-# Debug Button
-def idle(props, prop):
-    if not pngtuber_source:
-        print("Select your PNGTuber source")
-
-    source = obs.obs_get_source_by_name(pngtuber_source)
-    settings = obs.obs_source_get_settings(source)
-    obs.obs_data_set_string(settings, "file", idle_image_path)
-    obs.obs_source_update(source, settings);
-
-    obs.obs_data_release(settings)
-    obs.obs_source_release(source)
 
 
 def debug(props, prop):
