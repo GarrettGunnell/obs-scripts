@@ -18,7 +18,7 @@ class PNGTuber:
     isTalking = False
     isYelling = False
 
-    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold):
+    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
 
@@ -27,6 +27,7 @@ class PNGTuber:
         self.talking_threshold = talk_threshold
         self.yelling_image = yell_image
         self.yelling_threshold = yell_threshold
+        self.hold_yell = hold_yell
 
     def idle(self):
         if self.isIdle:
@@ -40,6 +41,10 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
 
     def talking(self):
+        if self.hold_yell and self.isYelling:
+            self.yelling()
+            return 
+        
         if self.isTalking:
             return
         
@@ -201,6 +206,9 @@ def script_properties():
 
     obs.obs_properties_add_path(properties, "yelling image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
 
+    hold_yell_b = obs.obs_properties_add_bool(properties, "hold yell", "Hold Yell?")
+    obs.obs_property_set_long_description(hold_yell_b, "Usually you'll only be above the yell threshold for a brief period, enable this if you want to keep the yelling sprite regardless of future audio levels until you stop talking.")
+
     if DEBUG:
         obs.obs_properties_add_button(properties, "debug button", "Debug", debug)
 
@@ -231,6 +239,7 @@ def script_update(settings):
     use_yelling = obs.obs_data_get_bool(settings, "use yell gate")
     yelling_image_path = obs.obs_data_get_string(settings, "yelling image path") if use_yelling else talking_image_path
     yelling_threshold = obs.obs_data_get_double(settings, "yelling threshold")
+    hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
 
     if pngtuber_source is None:
         print("Please select your PNGTuber source.")
@@ -244,7 +253,7 @@ def script_update(settings):
         print("Please select an image for talking.")
         return
     
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold)
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling)
 
 
 # Update (Called once per frame)
