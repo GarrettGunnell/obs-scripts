@@ -4,13 +4,33 @@ from ctypes import *
 from ctypes.util import find_library
 
 
+# Classes
+class Source(Structure):
+    pass
 
-# Global Parameters
-pngtuber_source = None
-idle_image_path = None
-talking_image_path = None
-audio_threshold = 0
-audio_volume = -999.999
+class Volmeter(Structure):
+    pass
+
+class PNGTuber:
+    def __init__(self, source, talk_image, talk_threshold):
+        self.source = source
+        self.settings = obs.obs_source_get_settings(source)
+
+        self.idle_image = obs.obs_data_get_string(self.settings, "file")
+        self.talking_image = talk_image
+        self.talking_threshold = talk_threshold
+
+    def update(self, volume):
+        if (volume > self.talking_threshold):
+            obs.obs_data_set_string(self.settings, "file", self.talking_image)
+            obs.obs_source_update(self.source, self.settings);
+        else:
+            obs.obs_data_set_string(self.settings, "file", self.idle_image)
+            obs.obs_source_update(self.source, self.settings);
+
+    def release(self):
+        obs.obs_data_release(self.settings)
+        obs.obs_source_release(self.source)
 
 
 # Audio Device Wrapper
@@ -23,12 +43,6 @@ def wrap(funcname, restype, argtypes):
     func.restype = restype
     func.argtypes = argtypes
     globals()["g_" + funcname] = func
-
-class Source(Structure):
-    pass
-
-class Volmeter(Structure):
-    pass
 
 volmeter_callback_t = CFUNCTYPE(None, c_void_p, POINTER(c_float), POINTER(c_float), POINTER(c_float))
 wrap("obs_get_source_by_name", POINTER(Source), argtypes=[c_char_p])
@@ -53,7 +67,6 @@ def write_volume(volume):
     global audio_volume
     audio_volume = volume
 
-
 OBS_FADER_LOG = 2
 G.lock = False
 G.noise = 999
@@ -65,24 +78,26 @@ G.source_name = "Media Source"
 G.volmeter = "not yet initialized volmeter instance"
 G.callback = write_volume
 
-
-def event_loop():
+def poll_audio():
     if not G.lock:
-        # print("setting volmeter")
-        print(G.source_name)
+        print("Attaching to:", G.source_name)
         source = g_obs_get_source_by_name(G.source_name.encode("utf-8"))
         G.volmeter = g_obs_volmeter_create(OBS_FADER_LOG)
         g_obs_volmeter_add_callback(G.volmeter, volmeter_callback, None)
         if g_obs_volmeter_attach_source(G.volmeter, source):
             g_obs_source_release(source)
             G.lock = True
-            print("Attached to source")
+            print("Attached to", G.source_name)
             return
     G.tick_acc += G.tick_mili
     if G.tick_acc > G.interval_sec:
         G.callback(G.noise)
         G.tick_acc = 0
 
+
+# Global Parameters
+audio_volume = -999.999
+pngtuber = None
 
 # Description displayed in the Scripts dialog window
 def script_description():
@@ -152,58 +167,38 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber_source, idle_image_path, talking_image_path, audio_threshold
+    global pngtuber
 
     if G.lock:
         remove_volmeter()
 
+    if pngtuber is not None:
+        pngtuber.release()
+
     G.source_name = obs.obs_data_get_string(settings, "audio source")
+
     pngtuber_source = obs.obs_data_get_string(settings, "png source")
     idle_image_path = obs.obs_data_get_string(settings, "idle image path")
     talking_image_path = obs.obs_data_get_string(settings, "talking image path")
     audio_threshold = obs.obs_data_get_double(settings, "talking threshold")
 
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source),talking_image_path, audio_threshold)
+
 
 # Update (Called once per frame)
 def script_tick(seconds):
-    if not G.lock:
-        print("Attaching to:", G.source_name)
-        source = g_obs_get_source_by_name(G.source_name.encode("utf-8"))
-        G.volmeter = g_obs_volmeter_create(OBS_FADER_LOG)
-        g_obs_volmeter_add_callback(G.volmeter, volmeter_callback, None)
-        if g_obs_volmeter_attach_source(G.volmeter, source):
-            g_obs_source_release(source)
-            G.lock = True
-            print("Attached to", G.source_name)
-            return
-    G.tick_acc += G.tick_mili
-    if G.tick_acc > G.interval_sec:
-        G.callback(G.noise)
-        G.tick_acc = 0
-
-    if (float(audio_volume) > audio_threshold):
-        source = obs.obs_get_source_by_name(pngtuber_source)
-        settings = obs.obs_source_get_settings(source)
-        obs.obs_data_set_string(settings, "file", talking_image_path)
-        obs.obs_source_update(source, settings);
-
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
-    else:
-        source = obs.obs_get_source_by_name(pngtuber_source)
-        settings = obs.obs_source_get_settings(source)
-        obs.obs_data_set_string(settings, "file", idle_image_path)
-        obs.obs_source_update(source, settings);
-
-        obs.obs_data_release(settings)
-        obs.obs_source_release(source)
-
-    #print(float(audio_volume), audio_threshold, audio_volume > audio_threshold)
+    poll_audio()
+    pngtuber.update(audio_volume)
 
 
 
 def script_unload():
-    remove_volmeter()
+    if G.lock:
+        remove_volmeter()
+    
+    if pngtuber is not None:
+        pngtuber.release()
+    
 
 
 # Debug Button
