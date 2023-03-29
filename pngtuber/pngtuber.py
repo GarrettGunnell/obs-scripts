@@ -114,6 +114,7 @@ def poll_audio():
 
 # Global Parameters
 audio_volume = -999.999
+audio_source = None
 pngtuber = None
 DEBUG = False
 
@@ -182,7 +183,7 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber
+    global pngtuber, audio_source
 
     if G.lock:
         remove_volmeter()
@@ -195,6 +196,8 @@ def script_update(settings):
     if G.source_name is None:
         print("Please select an audio source to control your PNGTuber.")
         return
+
+    audio_source = obs.obs_get_source_by_name(G.source_name)
 
     pngtuber_source = obs.obs_data_get_string(settings, "png source")
     talking_image_path = obs.obs_data_get_string(settings, "talking image path")
@@ -213,6 +216,10 @@ def script_update(settings):
 
 # Update (Called once per frame)
 def script_tick(seconds):
+    if audio_source is not None:
+        if obs.obs_source_muted(audio_source):
+            return
+
     if G.source_name is not None:
         poll_audio()
     
@@ -227,6 +234,9 @@ def script_unload():
     
     if pngtuber is not None:
         pngtuber.release()
+
+    if audio_source is not None:
+        obs.obs_source_release(audio_source)
     
 
 
