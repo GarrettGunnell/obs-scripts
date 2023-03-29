@@ -80,7 +80,6 @@ def remove_volmeter():
     g_obs_volmeter_remove_callback(G.volmeter, volmeter_callback, None)
     g_obs_volmeter_destroy(G.volmeter)
     G.lock = False
-    print("Removed volmeter & volmeter_callback")
 
 def write_volume(volume):
     global audio_volume
@@ -99,15 +98,14 @@ G.callback = write_volume
 
 def poll_audio():
     if not G.lock:
-        print("Attaching to:", G.source_name)
         source = g_obs_get_source_by_name(G.source_name.encode("utf-8"))
         G.volmeter = g_obs_volmeter_create(OBS_FADER_LOG)
         g_obs_volmeter_add_callback(G.volmeter, volmeter_callback, None)
         if g_obs_volmeter_attach_source(G.volmeter, source):
             g_obs_source_release(source)
             G.lock = True
-            print("Attached to", G.source_name)
             return
+        
     G.tick_acc += G.tick_mili
     if G.tick_acc > G.interval_sec:
         G.callback(G.noise)
@@ -194,18 +192,32 @@ def script_update(settings):
 
     G.source_name = obs.obs_data_get_string(settings, "audio source")
 
+    if G.source_name is None:
+        print("Please select an audio source to control your PNGTuber.")
+        return
+
     pngtuber_source = obs.obs_data_get_string(settings, "png source")
-    idle_image_path = obs.obs_data_get_string(settings, "idle image path")
     talking_image_path = obs.obs_data_get_string(settings, "talking image path")
     audio_threshold = obs.obs_data_get_double(settings, "talking threshold")
 
+    if pngtuber_source is None:
+        print("Please select your PNGTuber source.")
+        return
+    
+    if talking_image_path == "":
+        print("Please select an image for talking.")
+        return
+    
     pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source),talking_image_path, audio_threshold)
 
 
 # Update (Called once per frame)
 def script_tick(seconds):
-    poll_audio()
-    pngtuber.update(audio_volume)
+    if G.source_name is not None:
+        poll_audio()
+    
+    if pngtuber is not None:
+        pngtuber.update(audio_volume)
 
 
 
