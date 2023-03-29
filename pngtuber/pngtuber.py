@@ -12,6 +12,9 @@ class Volmeter(Structure):
     pass
 
 class PNGTuber:
+    isIdle = True
+    isTalking = False
+
     def __init__(self, source, talk_image, talk_threshold):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
@@ -20,13 +23,29 @@ class PNGTuber:
         self.talking_image = talk_image
         self.talking_threshold = talk_threshold
 
+    def idle(self):
+        if self.isIdle:
+            return
+        
+        self.isIdle = True
+        self.isTalking = False
+        obs.obs_data_set_string(self.settings, "file", self.idle_image)
+        obs.obs_source_update(self.source, self.settings);
+
+    def talking(self):
+        if self.isTalking:
+            return
+        
+        self.isIdle = False
+        self.isTalking = True
+        obs.obs_data_set_string(self.settings, "file", self.talking_image)
+        obs.obs_source_update(self.source, self.settings);
+
     def update(self, volume):
         if (volume > self.talking_threshold):
-            obs.obs_data_set_string(self.settings, "file", self.talking_image)
-            obs.obs_source_update(self.source, self.settings);
+            self.talking()
         else:
-            obs.obs_data_set_string(self.settings, "file", self.idle_image)
-            obs.obs_source_update(self.source, self.settings);
+            self.idle()
 
     def release(self):
         obs.obs_data_release(self.settings)
