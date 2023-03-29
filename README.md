@@ -42,3 +42,9 @@ This will load the script into OBS and you're all finished!
 ### Script Explanation
 
 For a more in depth explanation of the script and what the options do, please refer to the folder of the script you downloaded like [this](https://github.com/GarrettGunnell/obs-scripts/tree/main/pngtuber) one for example.
+
+## Disclaimer
+
+OBS scripts can be a little strange and OBS clearly doesn't prioritize their support very much. This means that scripts may cause unexpected crashes in weird fringe scenarios, but it shouldn't be much of a concern.
+
+If you experience frequent crashing, then your OBS is most likely out of date and you should update it.
