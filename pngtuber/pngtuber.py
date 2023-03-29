@@ -4,6 +4,7 @@ from ctypes import *
 from ctypes.util import find_library
 
 DEBUG = True
+DEBUG_AUDIO = True
 
 
 # Classes
@@ -108,6 +109,7 @@ def remove_volmeter():
 
 def write_volume(volume):
     global audio_volume
+    if DEBUG_AUDIO: print(volume)
     audio_volume = volume
 
 OBS_FADER_LOG = 2
@@ -177,6 +179,9 @@ def script_properties():
                 name = obs.obs_source_get_name(source)
                 obs.obs_property_list_add_string(audio_sources_list, name, name)
 
+    poll = obs.obs_properties_add_float(properties, "poll rate", "Poll Rate:", 0.01, 0.1, 0.01)
+    obs.obs_property_set_long_description(poll, "How often to sample the audio level (in seconds). Lower number will mean more accurate audio data but potentially worse performance.")
+
     png_sources_list = obs.obs_properties_add_list(
         properties,
         "png source",
@@ -230,6 +235,8 @@ def script_update(settings):
     if G.source_name is None:
         print("Please select an audio source to control your PNGTuber.")
         return
+
+    G.interval_sec = obs.obs_data_get_double(settings, "poll rate")
 
     audio_source = obs.obs_get_source_by_name(G.source_name)
 
