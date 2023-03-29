@@ -15,11 +15,12 @@ class Volmeter(Structure):
     pass
 
 class PNGTuber:
-    isIdle = False
-    isTalking = False
-    isYelling = False
+    is_idle = False
+    is_talking = False
+    is_yelling = False
+    tick_acc = 0.0
 
-    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell):
+    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell, idle_delay):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
 
@@ -29,41 +30,44 @@ class PNGTuber:
         self.yelling_image = yell_image
         self.yelling_threshold = yell_threshold
         self.hold_yell = hold_yell
+        self.idle_delay = idle_delay
 
     def idle(self):
-        if self.isIdle:
+        if self.is_idle:
             return
         
         if DEBUG: print("Idle")
-        self.isIdle = True
-        self.isTalking = False
-        self.isYelling = False
+        self.is_idle = True
+        self.is_talking = False
+        self.is_yelling = False
         obs.obs_data_set_string(self.settings, "file", self.idle_image)
         obs.obs_source_update(self.source, self.settings);
 
     def talking(self):
-        if self.hold_yell and self.isYelling:
+        self.tick_acc = 0.0
+        if self.hold_yell and self.is_yelling:
             self.yelling()
             return 
         
-        if self.isTalking:
+        if self.is_talking:
             return
         
         if DEBUG: print("Talking")
-        self.isIdle = False
-        self.isTalking = True
-        self.isYelling = False
+        self.is_idle = False
+        self.is_talking = True
+        self.is_yelling = False
         obs.obs_data_set_string(self.settings, "file", self.talking_image)
         obs.obs_source_update(self.source, self.settings);
     
     def yelling(self):
-        if self.isYelling:
+        self.tick_acc = 0.0
+        if self.is_yelling:
             return
         
         if DEBUG: print("Yelling")
-        self.isIdle = False
-        self.isTalking = False
-        self.isYelling = True
+        self.is_idle = False
+        self.is_talking = False
+        self.is_yelling = True
         obs.obs_data_set_string(self.settings, "file", self.yelling_image)
         obs.obs_source_update(self.source, self.settings);
 
@@ -71,7 +75,11 @@ class PNGTuber:
     def update(self, volume):
         if   (volume > self.yelling_threshold): self.yelling()
         elif (volume > self.talking_threshold): self.talking()
-        else: self.idle()
+        else: 
+            self.tick_acc += 0.016
+            if self.tick_acc > self.idle_delay:
+                self.tick_acc = 0.0
+                self.idle()
 
     def release(self):
         self.idle()
@@ -158,7 +166,9 @@ Change your PNGTuber source based on up to two sound gates.
 
 # Set Default Values
 def script_defaults(settings):
-    obs.obs_data_set_default_double(settings, "poll rate", 0.03)
+    obs.obs_data_set_default_double(settings, "poll rate", 0.02)
+    obs.obs_data_set_default_double(settings, "talking threshold", -14.0)
+    obs.obs_data_set_default_double(settings, "yelling threshold", -8.0)
 
 
 # UI
@@ -201,6 +211,9 @@ def script_properties():
                 obs.obs_property_list_add_string(png_sources_list, name, name)
         
         obs.source_list_release(sources)
+
+    delay = obs.obs_properties_add_float(properties, "idle delay", "Idle Delay:", 0.0, 1.0, 0.01)
+    obs.obs_property_set_long_description(delay, "How long to wait (in seconds) before returning idle after talking.")
 
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
 
@@ -249,6 +262,7 @@ def script_update(settings):
     yelling_image_path = obs.obs_data_get_string(settings, "yelling image path") if use_yelling else talking_image_path
     yelling_threshold = obs.obs_data_get_double(settings, "yelling threshold")
     hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
+    idle_delay = obs.obs_data_get_double(settings, "idle delay")
 
     if pngtuber_source is None:
         print("Please select your PNGTuber source.")
@@ -262,7 +276,7 @@ def script_update(settings):
         print("Please select an image for talking.")
         return
     
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling)
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay)
 
 
 # Update (Called once per frame)
