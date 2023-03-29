@@ -98,6 +98,7 @@ def poll_audio():
 # Global Parameters
 audio_volume = -999.999
 pngtuber = None
+DEBUG = False
 
 # Description displayed in the Scripts dialog window
 def script_description():
@@ -152,15 +153,12 @@ def script_properties():
         
         obs.source_list_release(sources)
 
-    obs.obs_properties_add_path(properties, "idle image path", "Idle Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
-
-    obs.obs_properties_add_button(properties, "idle button", "Idle", idle)
-
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
 
     obs.obs_properties_add_path(properties, "talking image path", "Talking Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
 
-    obs.obs_properties_add_button(properties, "talking button", "Talk", talk)
+    if DEBUG:
+        obs.obs_properties_add_button(properties, "talking button", "Debug", debug)
 
     return properties
 
@@ -215,5 +213,5 @@ def idle(props, prop):
     obs.obs_source_release(source)
 
 
-def talk(props, prop):
-    obs.timer_add(event_loop, G.tick)
+def debug(props, prop):
+    print("Debug")
