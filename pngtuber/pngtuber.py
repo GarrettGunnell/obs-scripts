@@ -218,7 +218,7 @@ def script_update(settings):
 def script_tick(seconds):
     if audio_source is not None:
         if obs.obs_source_muted(audio_source):
-            pngtuber.idle()
+            if pngtuber is not None: pngtuber.idle()
             return
 
     if G.source_name is not None:
