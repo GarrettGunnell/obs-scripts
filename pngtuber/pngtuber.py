@@ -6,6 +6,9 @@ from ctypes.util import find_library
 DEBUG = False
 DEBUG_AUDIO = False
 
+WINDOW_WIDTH = 0
+WINDOW_HEIGHT = 0
+
 
 # Classes
 class Source(Structure):
@@ -271,7 +274,7 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber, audio_source
+    global pngtuber, audio_source, WINDOW_WIDTH, WINDOW_HEIGHT
 
     if G.lock:
         remove_volmeter()
@@ -298,6 +301,14 @@ def script_update(settings):
     hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
     idle_delay = obs.obs_data_get_double(settings, "idle delay")
 
+    # Get screen dimensions
+    source = obs.obs_frontend_get_current_scene()
+    WINDOW_WIDTH = obs.obs_source_get_width(source)
+    WINDOW_HEIGHT = obs.obs_source_get_height(source)
+    obs.obs_source_release(source)
+
+    print(WINDOW_WIDTH, WINDOW_HEIGHT)
+
     if pngtuber_source is None:
         print("Please select your PNGTuber source.")
         return
@@ -309,7 +320,7 @@ def script_update(settings):
     if use_yelling and yelling_image_path == "":
         print("Please select an image for talking.")
         return
-    
+
     pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay)
 
 
