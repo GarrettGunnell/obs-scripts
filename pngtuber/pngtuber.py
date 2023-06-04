@@ -215,9 +215,32 @@ def script_properties():
     delay = obs.obs_properties_add_float(properties, "idle delay", "Idle Delay:", 0.0, 1.0, 0.01)
     obs.obs_property_set_long_description(delay, "How long to wait (in seconds) before returning idle after talking.")
 
+    idle_motion_list = obs.obs_properties_add_list(
+        properties,
+        "idle motion",
+        "Idle Motion:",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING,
+    )
+
+    animations_list = ["None", "Shake", "Vertical Bounce", "Horizontal Bounce", "Roll"]
+    for item in animations_list:
+        obs.obs_property_list_add_string(idle_motion_list, item, item)
+
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
 
     obs.obs_properties_add_path(properties, "talking image path", "Talking Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
+
+    talk_motion_list = obs.obs_properties_add_list(
+        properties,
+        "talk motion",
+        "Talk Motion:",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING,
+    )
+    
+    for item in animations_list:
+        obs.obs_property_list_add_string(talk_motion_list, item, item)
 
     ygate = obs.obs_properties_add_bool(properties, "use yell gate", "Use Yell Gate?")
     obs.obs_property_set_long_description(ygate, "Use this gate to transition to a different sprite when input volume exceeds the following threshold")
@@ -225,6 +248,17 @@ def script_properties():
     obs.obs_properties_add_float_slider(properties, "yelling threshold", "Yelling Threshold", -60.0, 0.0, 0.01)
 
     obs.obs_properties_add_path(properties, "yelling image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
+
+    yell_motion_list = obs.obs_properties_add_list(
+        properties,
+        "yell motion",
+        "Yell Motion:",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING,
+    )
+    
+    for item in animations_list:
+        obs.obs_property_list_add_string(yell_motion_list, item, item)
 
     hold_yell_b = obs.obs_properties_add_bool(properties, "hold yell", "Hold Yell?")
     obs.obs_property_set_long_description(hold_yell_b, "Usually you'll only be above the yell threshold for a brief period, enable this if you want to keep the yelling sprite regardless of future audio levels until you stop talking.")
