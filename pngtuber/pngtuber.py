@@ -177,6 +177,11 @@ def script_defaults(settings):
 # UI
 def script_properties():
     properties = obs.obs_properties_create()
+    
+    pos_x = obs.obs_properties_add_float_slider(properties, "x position", "X Position (%)", 0.0, 100.0, 0.01)
+    pos_y = obs.obs_properties_add_float_slider(properties, "y position", "Y Position (%)", 0.0, 100.0, 0.01)
+    obs.obs_property_set_long_description(pos_x, "Horizontal position of your pngtuber. Works in percentages so it's compatible with all screen sizes.")
+    obs.obs_property_set_long_description(pos_y, "Vertical position of your pngtuber. Works in percentages so it's compatible with all screen sizes.")
 
     audio_sources_list = obs.obs_properties_add_list(
         properties,
@@ -318,7 +323,7 @@ def script_update(settings):
         return
     
     if use_yelling and yelling_image_path == "":
-        print("Please select an image for talking.")
+        print("Please select an image for yelling.")
         return
 
     pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay)
