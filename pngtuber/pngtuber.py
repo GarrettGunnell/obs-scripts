@@ -1,3 +1,5 @@
+import math
+import time
 import obspython as obs
 from types import SimpleNamespace
 from ctypes import *
@@ -156,6 +158,9 @@ def poll_audio():
 audio_volume = -999.999
 audio_source = None
 pngtuber = None
+cached_scene_source = None
+cached_sceneitem = None
+cached_origin = obs.vec2()
 
 # Description displayed in the Scripts dialog window
 def script_description():
@@ -177,11 +182,6 @@ def script_defaults(settings):
 # UI
 def script_properties():
     properties = obs.obs_properties_create()
-    
-    pos_x = obs.obs_properties_add_float_slider(properties, "x position", "X Position (%)", 0.0, 100.0, 0.01)
-    pos_y = obs.obs_properties_add_float_slider(properties, "y position", "Y Position (%)", 0.0, 100.0, 0.01)
-    obs.obs_property_set_long_description(pos_x, "Horizontal position of your pngtuber. Works in percentages so it's compatible with all screen sizes.")
-    obs.obs_property_set_long_description(pos_y, "Vertical position of your pngtuber. Works in percentages so it's compatible with all screen sizes.")
 
     audio_sources_list = obs.obs_properties_add_list(
         properties,
@@ -279,7 +279,7 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber, audio_source, WINDOW_WIDTH, WINDOW_HEIGHT
+    global pngtuber, audio_source, cached_scene_source, cached_sceneitem, cached_origin
 
     if G.lock:
         remove_volmeter()
@@ -306,13 +306,16 @@ def script_update(settings):
     hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
     idle_delay = obs.obs_data_get_double(settings, "idle delay")
 
-    # Get screen dimensions
-    source = obs.obs_frontend_get_current_scene()
-    WINDOW_WIDTH = obs.obs_source_get_width(source)
-    WINDOW_HEIGHT = obs.obs_source_get_height(source)
-    obs.obs_source_release(source)
 
-    print(WINDOW_WIDTH, WINDOW_HEIGHT)
+    # Get screen dimensions
+    cached_scene_source = obs.obs_frontend_get_current_scene()
+    print("Active Scene:", obs.obs_source_get_name(cached_scene_source))
+    scene = obs.obs_scene_from_source(cached_scene_source)
+    cached_sceneitem = obs.obs_scene_find_source_recursive(scene, "Dev Image")
+    if cached_sceneitem is not None:
+        print("PNGTuber source found!")
+        obs.obs_sceneitem_get_pos(cached_sceneitem, cached_origin)
+        print("Cached PNGTuber Position:", cached_origin.x, cached_origin.y)
 
     if pngtuber_source is None:
         print("Please select your PNGTuber source.")
@@ -342,6 +345,12 @@ def script_tick(seconds):
     if pngtuber is not None:
         pngtuber.update(audio_volume)
 
+    if cached_sceneitem is not None:
+        offset = obs.vec2()
+        offset.x = cached_origin.x
+        offset.y = cached_origin.y - abs(math.cos(time.time() * math.pi) * 100)
+        obs.obs_sceneitem_set_pos(cached_sceneitem, offset)
+
 
 # Release memory
 def script_unload():
@@ -353,6 +362,10 @@ def script_unload():
 
     if audio_source is not None:
         obs.obs_source_release(audio_source)
+
+    if cached_scene_source is not None:
+        obs.obs_sceneitem_set_pos(cached_sceneitem, cached_origin)
+        obs.obs_source_release(cached_scene_source)
 
 
 def debug(props, prop):
