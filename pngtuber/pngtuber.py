@@ -20,6 +20,7 @@ class Volmeter(Structure):
     pass
 
 class PNGTuber:
+    is_paused = False
     is_idle = False
     is_talking = False
     is_yelling = False
@@ -38,7 +39,7 @@ class PNGTuber:
         self.idle_delay = idle_delay
 
     def idle(self):
-        if self.is_idle:
+        if self.is_idle or self.is_paused:
             return
         
         if DEBUG: print("Idle")
@@ -49,6 +50,8 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
 
     def talking(self):
+        if self.is_paused: return
+
         self.tick_acc = 0.0
         if self.hold_yell and self.is_yelling:
             self.yelling()
@@ -65,6 +68,8 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
     
     def yelling(self):
+        if self.is_paused: return
+        
         self.tick_acc = 0.0
         if self.is_yelling:
             return
@@ -78,6 +83,8 @@ class PNGTuber:
 
 
     def update(self, volume):
+        if self.is_paused: return
+        
         if   (volume > self.yelling_threshold): self.yelling()
         elif (volume > self.talking_threshold): self.talking()
         else: 
@@ -85,6 +92,17 @@ class PNGTuber:
             if self.tick_acc > self.idle_delay:
                 self.tick_acc = 0.0
                 self.idle()
+
+    def pause(self):
+        self.is_paused = True
+        self.tick_acc = 0.0
+        self.idle()
+    
+    def play(self):
+        self.is_paused = False
+
+    def paused(self):
+        return self.is_paused
 
     def release(self):
         self.idle()
@@ -184,6 +202,23 @@ def script_defaults(settings):
     obs.obs_data_set_default_double(settings, "yelling threshold", -8.0)
 
 
+# Callbacks
+
+def stop_pngtuber(x, y):
+    global pngtuber, cached_origin, cached_sceneitem
+    
+    if pngtuber is not None: 
+        pngtuber.pause()
+    
+    if cached_sceneitem is not None: 
+        obs.obs_sceneitem_set_pos(cached_sceneitem, cached_origin)
+
+def play_pngtuber(x, y):
+    global pngtuber
+    if pngtuber is not None: pngtuber.play()
+    if cached_sceneitem is not None:
+        obs.obs_sceneitem_get_pos(cached_sceneitem, cached_origin)
+
 # UI
 def script_properties():
     properties = obs.obs_properties_create()
@@ -280,6 +315,9 @@ def script_properties():
     hold_yell_b = obs.obs_properties_add_bool(properties, "hold yell", "Hold Yell?")
     obs.obs_property_set_long_description(hold_yell_b, "Usually you'll only be above the yell threshold for a brief period, enable this if you want to keep the yelling sprite regardless of future audio levels until you stop talking.")
 
+    obs.obs_properties_add_button(properties, "pause button", "Pause PNGTuber", stop_pngtuber)
+    obs.obs_properties_add_button(properties, "play button", "Play PNGTuber", play_pngtuber)
+
     if DEBUG:
         obs.obs_properties_add_button(properties, "debug button", "Debug", debug)
 
@@ -346,6 +384,7 @@ def script_update(settings):
     pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay)
 
 
+previous_offset = obs.vec2()
 # Update (Called once per frame)
 def script_tick(seconds):
     global previous_offset, cached_origin
@@ -361,8 +400,10 @@ def script_tick(seconds):
         pngtuber.update(audio_volume)
 
     if cached_sceneitem is not None:
+        if pngtuber.paused(): return
         offset = obs.vec2()
         t = time.time() * math.pi * idle_animation_frequency
+
         ''' up and down bounce animation
         offset.x = 0
         offset.y = abs(math.cos(t) * idle_animation_amplitude)
@@ -384,6 +425,7 @@ def script_tick(seconds):
 
 # Release memory
 def script_unload():
+    global pngtuber, audio_source, cached_scene_source, cached_origin, cached_sceneitem
     if G.lock:
         remove_volmeter()
     
