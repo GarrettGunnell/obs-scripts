@@ -20,13 +20,15 @@ class Volmeter(Structure):
     pass
 
 class PNGTuber:
+    origin = obs.vec2()
+    sceneitem = None
     is_paused = False
     is_idle = False
     is_talking = False
     is_yelling = False
     tick_acc = 0.0
 
-    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell, idle_delay):
+    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell, idle_delay, origin, sceneitem):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
 
@@ -37,6 +39,8 @@ class PNGTuber:
         self.yelling_threshold = yell_threshold
         self.hold_yell = hold_yell
         self.idle_delay = idle_delay
+        self.origin = origin
+        self.sceneitem = sceneitem
 
     def idle(self):
         if self.is_idle or self.is_paused:
@@ -92,6 +96,44 @@ class PNGTuber:
             if self.tick_acc > self.idle_delay:
                 self.tick_acc = 0.0
                 self.idle()
+
+        offset = obs.vec2()
+        
+        t = time.time() * math.pi * idle_animation_frequency
+
+        ''' up and down bounce animation
+        offset.x = 0
+        offset.y = abs(math.cos(t) * idle_animation_amplitude)
+        '''
+
+        #offset.x = (math.sin(t) * idle_animation_amplitude)
+        #offset.y = abs(math.cos(t) * idle_animation_amplitude)
+
+        offset.x = 0
+        offset.y = 0
+
+        g = 0.5
+        f = idle_animation_frequency
+        a = idle_animation_amplitude
+        for i in range(0, 3):
+            v = math.cos(time.time() * f + i * 0.35) * a
+            offset.x += v
+            f *= 2
+            a *= g
+
+        g = 0.5
+        f = idle_animation_frequency
+        a = idle_animation_amplitude
+        for i in range(0, 3):
+            v = math.sin(time.time() * f + i * 0.35) * a
+            offset.y += v
+            f *= 2
+            a *= g
+
+        new_position = obs.vec2()
+        new_position.x = self.origin.x - offset.x
+        new_position.y = self.origin.y - offset.y
+        obs.obs_sceneitem_set_pos(self.sceneitem, new_position)
 
     def pause(self):
         self.is_paused = True
@@ -203,7 +245,6 @@ def script_defaults(settings):
 
 
 # Callbacks
-
 def stop_pngtuber(x, y):
     global pngtuber, cached_origin, cached_sceneitem
     
@@ -276,7 +317,7 @@ def script_properties():
         obs.obs_property_list_add_string(idle_motion_list, item, item)
 
     obs.obs_properties_add_float_slider(properties, "idle animation amplitude", "Animation Strength", 0.0, 100.0, 0.01)
-    obs.obs_properties_add_float_slider(properties, "idle animation frequency", "Animation Speed", 0.0, 5.0, 0.01)
+    obs.obs_properties_add_float_slider(properties, "idle animation frequency", "Animation Speed", 0.0, 10.0, 0.01)
 
 
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
@@ -381,13 +422,12 @@ def script_update(settings):
         print("Please select an image for yelling.")
         return
 
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay)
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay, cached_origin, cached_sceneitem)
 
 
-previous_offset = obs.vec2()
 # Update (Called once per frame)
 def script_tick(seconds):
-    global previous_offset, cached_origin
+    global audio_source, cached_origin, pngtuber, cached_sceneitem
     if audio_source is not None:
         if obs.obs_source_muted(audio_source):
             if pngtuber is not None: pngtuber.idle()
@@ -398,30 +438,7 @@ def script_tick(seconds):
     
     if pngtuber is not None:
         pngtuber.update(audio_volume)
-
-    if cached_sceneitem is not None:
-        if pngtuber.paused(): return
-        offset = obs.vec2()
-        t = time.time() * math.pi * idle_animation_frequency
-
-        ''' up and down bounce animation
-        offset.x = 0
-        offset.y = abs(math.cos(t) * idle_animation_amplitude)
-        '''
-
-        ''' left to right bounce animation
-        offset.x = (math.sin(t) * idle_animation_amplitude)
-        offset.y = abs(math.cos(t) * idle_animation_amplitude)
-        '''
-
-        offset.x = (math.sin(0.5 * t) * math.sin(0.75 * t) * math.sin(0.35 * t) * math.cos(t)) * idle_animation_amplitude
-        offset.y = (math.cos(0.5 * t) * math.cos(0.75 * t) * math.cos(0.35 * t) * math.sin(t)) * idle_animation_amplitude
-
-        new_position = obs.vec2()
-        new_position.x = cached_origin.x + offset.x
-        new_position.y = cached_origin.y - offset.y
-        obs.obs_sceneitem_set_pos(cached_sceneitem, new_position)
-
+        
 
 # Release memory
 def script_unload():
