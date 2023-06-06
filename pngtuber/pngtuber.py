@@ -161,6 +161,11 @@ pngtuber = None
 cached_scene_source = None
 cached_sceneitem = None
 cached_origin = obs.vec2()
+cached_origin.x = 0
+cached_origin.y = 0
+idle_animation_amplitude = 0.0
+idle_animation_frequency = 0.0
+
 
 # Description displayed in the Scripts dialog window
 def script_description():
@@ -235,6 +240,10 @@ def script_properties():
     for item in animations_list:
         obs.obs_property_list_add_string(idle_motion_list, item, item)
 
+    obs.obs_properties_add_float_slider(properties, "idle animation amplitude", "Animation Strength", 0.0, 100.0, 0.01)
+    obs.obs_properties_add_float_slider(properties, "idle animation frequency", "Animation Speed", 0.0, 5.0, 0.01)
+
+
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
 
     obs.obs_properties_add_path(properties, "talking image path", "Talking Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
@@ -279,7 +288,7 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber, audio_source, cached_scene_source, cached_sceneitem, cached_origin
+    global pngtuber, audio_source, cached_scene_source, cached_sceneitem, cached_origin, idle_animation_amplitude, idle_animation_frequency
 
     if G.lock:
         remove_volmeter()
@@ -305,6 +314,8 @@ def script_update(settings):
     yelling_threshold = obs.obs_data_get_double(settings, "yelling threshold")
     hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
     idle_delay = obs.obs_data_get_double(settings, "idle delay")
+    idle_animation_amplitude = obs.obs_data_get_double(settings, "idle animation amplitude") * 10
+    idle_animation_frequency = obs.obs_data_get_double(settings, "idle animation frequency")
 
 
     # Get screen dimensions
@@ -313,6 +324,9 @@ def script_update(settings):
     scene = obs.obs_scene_from_source(cached_scene_source)
     cached_sceneitem = obs.obs_scene_find_source_recursive(scene, "Dev Image")
     if cached_sceneitem is not None:
+        if cached_origin.x != 0 and cached_origin.y != 0:
+            obs.obs_sceneitem_set_pos(cached_sceneitem, cached_origin)
+
         print("PNGTuber source found!")
         obs.obs_sceneitem_get_pos(cached_sceneitem, cached_origin)
         print("Cached PNGTuber Position:", cached_origin.x, cached_origin.y)
@@ -334,6 +348,7 @@ def script_update(settings):
 
 # Update (Called once per frame)
 def script_tick(seconds):
+    global previous_offset, cached_origin
     if audio_source is not None:
         if obs.obs_source_muted(audio_source):
             if pngtuber is not None: pngtuber.idle()
@@ -347,9 +362,24 @@ def script_tick(seconds):
 
     if cached_sceneitem is not None:
         offset = obs.vec2()
-        offset.x = cached_origin.x
-        offset.y = cached_origin.y - abs(math.cos(time.time() * math.pi) * 100)
-        obs.obs_sceneitem_set_pos(cached_sceneitem, offset)
+        t = time.time() * math.pi * idle_animation_frequency
+        ''' up and down bounce animation
+        offset.x = 0
+        offset.y = abs(math.cos(t) * idle_animation_amplitude)
+        '''
+
+        ''' left to right bounce animation
+        offset.x = (math.sin(t) * idle_animation_amplitude)
+        offset.y = abs(math.cos(t) * idle_animation_amplitude)
+        '''
+
+        offset.x = (math.sin(0.5 * t) * math.sin(0.75 * t) * math.sin(0.35 * t) * math.cos(t)) * idle_animation_amplitude
+        offset.y = (math.cos(0.5 * t) * math.cos(0.75 * t) * math.cos(0.35 * t) * math.sin(t)) * idle_animation_amplitude
+
+        new_position = obs.vec2()
+        new_position.x = cached_origin.x + offset.x
+        new_position.y = cached_origin.y - offset.y
+        obs.obs_sceneitem_set_pos(cached_sceneitem, new_position)
 
 
 # Release memory
