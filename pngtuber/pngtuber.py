@@ -43,7 +43,7 @@ class PNGTuber:
         self.sceneitem = sceneitem
 
     def idle(self):
-        if self.is_idle or self.is_paused:
+        if self.is_idle:
             return
         
         if DEBUG: print("Idle")
@@ -54,8 +54,6 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
 
     def talking(self):
-        if self.is_paused: return
-
         self.tick_acc = 0.0
         if self.hold_yell and self.is_yelling:
             self.yelling()
@@ -72,8 +70,6 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
     
     def yelling(self):
-        if self.is_paused: return
-        
         self.tick_acc = 0.0
         if self.is_yelling:
             return
@@ -87,7 +83,7 @@ class PNGTuber:
 
 
     def update(self, volume):
-        if self.is_paused: return
+        if self.is_paused or self.sceneitem is None: return
         
         if   (volume > self.yelling_threshold): self.yelling()
         elif (volume > self.talking_threshold): self.talking()
@@ -145,6 +141,11 @@ class PNGTuber:
 
     def paused(self):
         return self.is_paused
+    
+    def update_sceneitem(self, sceneitem):
+        obs.obs_sceneitem_set_pos(self.sceneitem, self.origin)
+        self.sceneitem = sceneitem
+        obs.obs_sceneitem_get_pos(self.sceneitem, self.origin)
 
     def release(self):
         self.idle()
@@ -427,7 +428,7 @@ def script_update(settings):
 
 # Update (Called once per frame)
 def script_tick(seconds):
-    global audio_source, cached_origin, pngtuber, cached_sceneitem
+    global audio_source, cached_origin, pngtuber, cached_sceneitem, cached_scene_source
     if audio_source is not None:
         if obs.obs_source_muted(audio_source):
             if pngtuber is not None: pngtuber.idle()
@@ -435,10 +436,32 @@ def script_tick(seconds):
 
     if G.source_name is not None:
         poll_audio()
+
+    # Handle scene changes
+    active_scene_source = obs.obs_frontend_get_current_scene()
+    cached_scene_name = obs.obs_source_get_name(cached_scene_source)
+    active_scene_name = obs.obs_source_get_name(active_scene_source)
+
+    if cached_scene_name != active_scene_name:
+        obs.obs_source_release(cached_scene_source)
+        cached_scene_source = active_scene_source
+        cached_sceneitem = None
+        if pngtuber is not None: pngtuber.pause()
+    else:
+        obs.obs_source_release(active_scene_source)
+
+    # Inject into detected scene item
+    if cached_sceneitem is None:
+        scene = obs.obs_scene_from_source(cached_scene_source)
+        cached_sceneitem = obs.obs_scene_find_source_recursive(scene, "Dev Image")
+        if cached_sceneitem is not None:
+            pngtuber.update_sceneitem(cached_sceneitem)
+            pngtuber.play()
+
     
     if pngtuber is not None:
         pngtuber.update(audio_volume)
-        
+
 
 # Release memory
 def script_unload():
