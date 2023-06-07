@@ -179,7 +179,53 @@ class PNGTuber:
 
     def easing(self):
         x = max(0, min(1, self.tick_acc))
-        return x * x
+
+        match self.animation_settings.easing_function:
+            case "Linear":
+                return x
+            case "easeInQuad":
+                return x * x
+            case "easeOutQuad":
+                return 1 - (1 - x) * (1 - x)
+            case "easeInOutQuad":
+                return 2 * x * x if x < 0.5 else 1 - ((-2 * x + 2) ** 2) / 2
+            case "easeInElastic":
+                c4 = (2 * math.pi) / 3
+                if x == 0: return 0
+                if x == 1: return 1
+                return -2 ** (10 * x - 10) * math.sin((x * 10 - 10.75) * c4)
+            case "easeOutElastic":
+                c4 = (2 * math.pi) / 3
+                if x == 0: return 0
+                if x == 1: return 1
+                return 2 ** (-10 * x) * math.sin((x * 10 - 0.75) * c4) + 1
+            case "easeInOutElastic":
+                c5 = (2 * math.pi) / 4.5
+                if x == 0: return 0
+                if x == 1: return 1
+                if x < 0.5:
+                    return -(2 ** (20 * x - 10) * math.sin((20 * x - 11.125) * c5)) / 2
+                return (2 ** (-20 * x + 10) * math.sin((20 * x - 11.125) * c5)) / 2 + 1
+            case "easeInBounce":
+                n1 = 7.5625
+                d1 = 2.75
+                x = 1 - x
+                output = 0
+                if (x < 1 / d1): output = n1 * x * x
+                elif (x < 2 / d1):
+                    x -= 1.5 / d1
+                    output = n1 * x * x + 0.75
+                elif (x < 2.5 / d1):
+                    x -= 2.25 / d1
+                    output = n1 * x * x + 0.9375
+                else:
+                    x -= 2.625 / d1
+                    output = n1 * x * x + 0.984375
+
+                return 1 - output
+
+            
+        return x
 
     def update(self, volume):
         if self.is_paused or self.sceneitem is None: return
