@@ -87,11 +87,14 @@ class PNGTuber:
 
     def idle(self):
         if DEBUG: print("Idle")
+
+        if self.is_idle:
+            return
+        
         self.is_idle = True
         self.is_talking = False
         self.is_yelling = False
-        obs.obs_data_set_string(self.settings, "file", self.idle_blink_image if self.is_blinking else self.idle_image)
-        obs.obs_source_update(self.source, self.settings);
+        self.set_sprite()
 
     def talking(self):
         if self.hold_yell and self.is_yelling:
@@ -100,23 +103,45 @@ class PNGTuber:
         
         if self.tick_acc < 1:
             self.tick_acc += self.get_delta_time() * BLEND_SPEED
+
+        if self.is_talking:
+            return
         
         if DEBUG: print("Talking")
         self.is_idle = False
         self.is_talking = True
         self.is_yelling = False
-        obs.obs_data_set_string(self.settings, "file", self.talking_blink_image if self.is_blinking else self.talking_image)
-        obs.obs_source_update(self.source, self.settings);
+        self.set_sprite()
     
     def yelling(self):
         if self.tick_acc < 1:
             self.tick_acc += self.get_delta_time() * BLEND_SPEED
+
+        if self.is_yelling:
+            return
             
         if DEBUG: print("Yelling")
         self.is_idle = False
         self.is_talking = False
         self.is_yelling = True
-        obs.obs_data_set_string(self.settings, "file", self.yelling_blink_image if self.is_blinking else self.yelling_image)
+        self.set_sprite()
+
+    def set_sprite(self):
+        sprite = ""
+        if self.is_idle: sprite = self.idle_image
+        if self.is_talking: sprite = self.talking_image
+        if self.is_yelling: sprite = self.yelling_image
+
+        obs.obs_data_set_string(self.settings, "file", sprite)
+        obs.obs_source_update(self.source, self.settings)
+
+    def blink(self):
+        sprite = ""
+        if self.is_idle: sprite = self.idle_blink_image
+        if self.is_talking: sprite = self.talking_blink_image
+        if self.is_yelling: sprite = self.yelling_blink_image
+
+        obs.obs_data_set_string(self.settings, "file", sprite)
         obs.obs_source_update(self.source, self.settings)
 
     
@@ -238,10 +263,12 @@ class PNGTuber:
                     self.blinking_timer = 0
                     self.blink_timer = 0
                     self.is_blinking = False
+                    self.set_sprite()
             else:
                 self.blink_timer += self.get_delta_time()
                 if self.blink_timer > self.animation_settings.blink_timer:
                     self.is_blinking = True
+                    self.blink()
 
 
         if   (volume > self.yelling_threshold): self.yelling()
