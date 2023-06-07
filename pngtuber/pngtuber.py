@@ -74,6 +74,12 @@ class PNGTuber:
         self.sceneitem = sceneitem
         self.animation_settings = animation_settings
 
+    def able_to_blink(self):
+        if self.idle_blink_image == "" or self.talking_blink_image == "" or self.yelling_blink_image == "":
+            return False
+        
+        return True
+
     def get_delta_time(self):
         return time.time() - self.previous_frame_time
 
@@ -177,17 +183,17 @@ class PNGTuber:
         if self.is_paused or self.sceneitem is None: return
         
         # Update sprite
-
-        if self.is_blinking:
-            self.blinking_timer += self.get_delta_time()
-            if self.blinking_timer > self.animation_settings.blink_length:
-                self.blinking_timer = 0
-                self.blink_timer = 0
-                self.is_blinking = False
-        else:
-            self.blink_timer += self.get_delta_time()
-            if self.blink_timer > self.animation_settings.blink_timer:
-                self.is_blinking = True
+        if self.able_to_blink():
+            if self.is_blinking:
+                self.blinking_timer += self.get_delta_time()
+                if self.blinking_timer > self.animation_settings.blink_length:
+                    self.blinking_timer = 0
+                    self.blink_timer = 0
+                    self.is_blinking = False
+            else:
+                self.blink_timer += self.get_delta_time()
+                if self.blink_timer > self.animation_settings.blink_timer:
+                    self.is_blinking = True
 
 
         if   (volume > self.yelling_threshold): self.yelling()
@@ -332,6 +338,12 @@ def script_defaults(settings):
     obs.obs_data_set_default_double(settings, "yelling threshold", -8.0)
     obs.obs_data_set_default_double(settings, "blink timer", 5.0)
     obs.obs_data_set_default_double(settings, "blink length", 0.33)
+    obs.obs_data_set_default_double(settings, "idle amplitude", 1.0)
+    obs.obs_data_set_default_double(settings, "idle frequency", 1.0)
+    obs.obs_data_set_default_double(settings, "talk amplitude", 1.0)
+    obs.obs_data_set_default_double(settings, "talk frequency", 1.0)
+    obs.obs_data_set_default_double(settings, "yell amplitude", 1.0)
+    obs.obs_data_set_default_double(settings, "yell frequency", 1.0)
 
 
 # Callbacks
