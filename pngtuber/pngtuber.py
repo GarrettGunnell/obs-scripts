@@ -59,9 +59,10 @@ class PNGTuber:
     blink_timer = 0.0
     blinking_timer = 0.0
 
-    def __init__(self, source, sprite_settings, talk_threshold, yell_threshold, hold_yell, origin, sceneitem, animation_settings):
-        self.source = source
-        self.settings = obs.obs_source_get_settings(source)
+    def __init__(self, source_name, sprite_settings, talk_threshold, yell_threshold, hold_yell, origin, sceneitem, animation_settings):
+        self.source_name = source_name
+        self.source = obs.obs_get_source_by_name(source_name)
+        self.settings = obs.obs_source_get_settings(self.source)
 
         self.idle_image = obs.obs_data_get_string(self.settings, "file")
         self.idle_blink_image = sprite_settings.idle_blink_image
@@ -623,7 +624,7 @@ def script_update(settings):
     # Get screen dimensions
     cached_scene_source = obs.obs_frontend_get_current_scene()
     scene = obs.obs_scene_from_source(cached_scene_source)
-    cached_sceneitem = obs.obs_scene_find_source_recursive(scene, "Dev Image")
+    cached_sceneitem = obs.obs_scene_find_source_recursive(scene, pngtuber_source)
     if cached_sceneitem is not None:
         if cached_origin.x != 0 and cached_origin.y != 0:
             obs.obs_sceneitem_set_pos(cached_sceneitem, cached_origin)
@@ -642,7 +643,7 @@ def script_update(settings):
         print("Please select an image for yelling.")
         return
 
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), sprite_settings, talking_threshold, yelling_threshold, hold_yelling, cached_origin, cached_sceneitem, animation_settings)
+    pngtuber = PNGTuber(pngtuber_source, sprite_settings, talking_threshold, yelling_threshold, hold_yelling, cached_origin, cached_sceneitem, animation_settings)
 
 
 # Update (Called once per frame)
@@ -672,7 +673,7 @@ def script_tick(seconds):
     # Inject into detected scene item
     if cached_sceneitem is None:
         scene = obs.obs_scene_from_source(cached_scene_source)
-        cached_sceneitem = obs.obs_scene_find_source_recursive(scene, "Dev Image")
+        cached_sceneitem = obs.obs_scene_find_source_recursive(scene, pngtuber.source_name)
         if cached_sceneitem is not None:
             pngtuber.update_sceneitem(cached_sceneitem)
             pngtuber.play()
