@@ -14,7 +14,7 @@ If you have issues please contact me here: https://twitter.com/Acerola_t or [Dis
 * * Animate your PNGTuber by swapping between sprites based on your mic volume as well as optional blinking sprites to bring your PNGTuber to life.
 * * Customize how your PNGTuber moves during different states with different animation options.
 * * * [Video Example](https://www.youtube.com/watch?v=30J48sxX1hM&ab_channel=Acerola)
-* * * [Video Tutorial]()
+* * * [Video Tutorial](https://www.youtube.com/watch?v=uovh0BJ__ik&ab_channel=Acerola)
 
 # How To Use
 
