@@ -55,7 +55,7 @@ class PNGTuber:
     blink_timer = 0.0
     blinking_timer = 0.0
 
-    def __init__(self, source, sprite_settings, talk_threshold, yell_threshold, hold_yell, idle_delay, origin, sceneitem, animation_settings):
+    def __init__(self, source, sprite_settings, talk_threshold, yell_threshold, hold_yell, origin, sceneitem, animation_settings):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
 
@@ -68,7 +68,6 @@ class PNGTuber:
         self.yelling_blink_image = sprite_settings.yell_blink_image
         self.yelling_threshold = yell_threshold
         self.hold_yell = hold_yell
-        self.idle_delay = idle_delay
         self.origin = origin
         self.sceneitem = sceneitem
         self.animation_settings = animation_settings
@@ -176,6 +175,19 @@ class PNGTuber:
         if self.is_paused or self.sceneitem is None: return
         
         # Update sprite
+
+        if self.is_blinking:
+            self.blinking_timer += self.get_delta_time()
+            if self.blinking_timer > 0.3:
+                self.blinking_timer = 0
+                self.blink_timer = 0
+                self.is_blinking = False
+        else:
+            self.blink_timer += self.get_delta_time()
+            if self.blink_timer > 5:
+                self.is_blinking = True
+
+
         if   (volume > self.yelling_threshold): self.yelling()
         elif (volume > self.talking_threshold): self.talking()
         else: 
@@ -375,11 +387,7 @@ def script_properties():
         
         obs.source_list_release(sources)
 
-    delay = obs.obs_properties_add_float(properties, "idle delay", "Idle Delay:", 0.0, 1.0, 0.01)
-    obs.obs_property_set_long_description(delay, "How long to wait (in seconds) before returning idle after talking.")
-
     obs.obs_properties_add_path(properties, "idle blink image path", "Idle Blink Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
-
 
     idle_motion_list = obs.obs_properties_add_list(
         properties,
@@ -395,7 +403,6 @@ def script_properties():
 
     obs.obs_properties_add_float_slider(properties, "idle amplitude", "Animation Strength", 0.0, 100.0, 0.01)
     obs.obs_properties_add_float_slider(properties, "idle frequency", "Animation Speed", 0.0, 10.0, 0.01)
-
 
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
 
@@ -423,7 +430,6 @@ def script_properties():
 
     obs.obs_properties_add_path(properties, "yelling image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
     obs.obs_properties_add_path(properties, "yelling blink image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
-
 
     yell_motion_list = obs.obs_properties_add_list(
         properties,
@@ -481,7 +487,6 @@ def script_update(settings):
     yelling_blink_image_path = obs.obs_data_get_string(settings, "yelling blink image path") if use_yelling else talking_blink_image_path
     yelling_threshold = obs.obs_data_get_double(settings, "yelling threshold")
     hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
-    idle_delay = obs.obs_data_get_double(settings, "idle delay")
     idle_animation = obs.obs_data_get_string(settings, "idle animation")
     idle_amplitude = obs.obs_data_get_double(settings, "idle amplitude") * 10
     idle_frequency = obs.obs_data_get_double(settings, "idle frequency")
@@ -517,7 +522,7 @@ def script_update(settings):
         print("Please select an image for yelling.")
         return
 
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), sprite_settings, talking_threshold, yelling_threshold, hold_yelling, idle_delay, cached_origin, cached_sceneitem, animation_settings)
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), sprite_settings, talking_threshold, yelling_threshold, hold_yelling, cached_origin, cached_sceneitem, animation_settings)
 
 
 # Update (Called once per frame)
