@@ -24,7 +24,7 @@ class Volmeter(Structure):
     pass
 
 class AnimationSettings:
-    def __init__(self, idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency):
+    def __init__(self, idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency, blink_timer, blink_length):
         self.idle_animation = idle_animation
         self.idle_amplitude = idle_amplitude
         self.idle_frequency = idle_frequency
@@ -34,6 +34,8 @@ class AnimationSettings:
         self.yell_animation = yell_animation
         self.yell_amplitude = yell_amplitude
         self.yell_frequency = yell_frequency
+        self.blink_timer = blink_timer
+        self.blink_length = blink_length
 
 class SpriteSettings:
     def __init__(self, idle_blink_image, talk_image, talk_blink_image, yell_image, yell_blink_image):
@@ -178,13 +180,13 @@ class PNGTuber:
 
         if self.is_blinking:
             self.blinking_timer += self.get_delta_time()
-            if self.blinking_timer > 0.3:
+            if self.blinking_timer > self.animation_settings.blink_length:
                 self.blinking_timer = 0
                 self.blink_timer = 0
                 self.is_blinking = False
         else:
             self.blink_timer += self.get_delta_time()
-            if self.blink_timer > 5:
+            if self.blink_timer > self.animation_settings.blink_timer:
                 self.is_blinking = True
 
 
@@ -328,6 +330,8 @@ def script_defaults(settings):
     obs.obs_data_set_default_double(settings, "poll rate", 0.02)
     obs.obs_data_set_default_double(settings, "talking threshold", -14.0)
     obs.obs_data_set_default_double(settings, "yelling threshold", -8.0)
+    obs.obs_data_set_default_double(settings, "blink timer", 5.0)
+    obs.obs_data_set_default_double(settings, "blink length", 0.33)
 
 
 # Callbacks
@@ -407,7 +411,7 @@ def script_properties():
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
 
     obs.obs_properties_add_path(properties, "talking image path", "Talking Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
-    obs.obs_properties_add_path(properties, "talking blink image path", "Talking Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
+    obs.obs_properties_add_path(properties, "talking blink image path", "Talking Blink Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
 
     talk_motion_list = obs.obs_properties_add_list(
         properties,
@@ -429,7 +433,7 @@ def script_properties():
     obs.obs_properties_add_float_slider(properties, "yelling threshold", "Yelling Threshold", -60.0, 0.0, 0.01)
 
     obs.obs_properties_add_path(properties, "yelling image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
-    obs.obs_properties_add_path(properties, "yelling blink image path", "Yelling Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
+    obs.obs_properties_add_path(properties, "yelling blink image path", "Yelling Blink Image Path:", obs.OBS_PATH_FILE, "All formats (*.bmp *.tga *.png *.jpeg *.jpg *.jxr *.gif *.psd *.webp);; BMP Files (*.bmp);; Targa Files (*.tga);; PNG Files (*.png);; JPEG Files (*.jpeg, *.jpg);; JXR Files (*.jxr);; GIF Files (*.gif);; PSD Files (*.psd);; WebP Files (*.webp);; All Files (*.*)", "C:/Pictures/")
 
     yell_motion_list = obs.obs_properties_add_list(
         properties,
@@ -447,6 +451,12 @@ def script_properties():
 
     hold_yell_b = obs.obs_properties_add_bool(properties, "hold yell", "Hold Yell?")
     obs.obs_property_set_long_description(hold_yell_b, "Usually you'll only be above the yell threshold for a brief period, enable this if you want to keep the yelling sprite regardless of future audio levels until you stop talking.")
+
+    blink_timer = obs.obs_properties_add_float_slider(properties, "blink timer", "Blink Timer", 0.01, 10, 0.01)
+    obs.obs_property_set_long_description(blink_timer, "The average time between blinks for a human adult is 5 seconds.")
+
+    blink_length = obs.obs_properties_add_float_slider(properties, "blink length", "Blink Length", 0.01, 1, 0.01)
+    obs.obs_property_set_long_description(blink_length, "The average time it takes for a human adult to complete a blink is 0.3 seconds.")
 
     obs.obs_properties_add_button(properties, "pause button", "Pause PNGTuber", stop_pngtuber)
     obs.obs_properties_add_button(properties, "play button", "Play PNGTuber", play_pngtuber)
@@ -496,8 +506,10 @@ def script_update(settings):
     yell_animation = obs.obs_data_get_string(settings, "yell animation")
     yell_amplitude = obs.obs_data_get_double(settings, "yell amplitude") * 10
     yell_frequency = obs.obs_data_get_double(settings, "yell frequency")
+    blink_timer = obs.obs_data_get_double(settings, "blink timer")
+    blink_length = obs.obs_data_get_double(settings, "blink length")
 
-    animation_settings = AnimationSettings(idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency)
+    animation_settings = AnimationSettings(idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency, blink_timer, blink_length)
     sprite_settings = SpriteSettings(idle_blink_image_path, talking_image_path, talking_blink_image_path, yelling_image_path, yelling_blink_image_path)
 
     # Get screen dimensions
