@@ -66,10 +66,10 @@ class PNGTuber:
 
         self.idle_image = obs.obs_data_get_string(self.settings, "file")
         self.idle_blink_image = sprite_settings.idle_blink_image
-        self.talking_image = sprite_settings.talk_image
+        self.talking_image = self.idle_image if sprite_settings.talk_image == "" else sprite_settings.talk_image
         self.talking_blink_image = sprite_settings.talk_blink_image
         self.talking_threshold = talk_threshold
-        self.yelling_image = sprite_settings.yell_image
+        self.yelling_image = self.talking_image if sprite_settings.yell_image == "" else sprite_settings.yell_image
         self.yelling_blink_image = sprite_settings.yell_blink_image
         self.yelling_threshold = yell_threshold
         self.hold_yell = hold_yell
@@ -634,14 +634,6 @@ def script_update(settings):
     if pngtuber_source is None:
         print("Please select your PNGTuber source.")
         return
-    
-    if talking_image_path == "":
-        print("Please select an image for talking.")
-        return
-    
-    if use_yelling and yelling_image_path == "":
-        print("Please select an image for yelling.")
-        return
 
     pngtuber = PNGTuber(pngtuber_source, sprite_settings, talking_threshold, yelling_threshold, hold_yelling, cached_origin, cached_sceneitem, animation_settings)
 
@@ -671,7 +663,7 @@ def script_tick(seconds):
         obs.obs_source_release(active_scene_source)
 
     # Inject into detected scene item
-    if cached_sceneitem is None:
+    if cached_sceneitem is None and pngtuber is not None:
         scene = obs.obs_scene_from_source(cached_scene_source)
         cached_sceneitem = obs.obs_scene_find_source_recursive(scene, pngtuber.source_name)
         if cached_sceneitem is not None:
