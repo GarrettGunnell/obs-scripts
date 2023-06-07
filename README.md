@@ -2,6 +2,8 @@
 
 These are scripts I have made to assist my stream, feel free to use them yourself!
 
+Download them [here](https://github.com/GarrettGunnell/obs-scripts/releases)
+
 If you do use them, I'd love it if you would credit me so that others can easily find the same tool.
 
 If you have issues please contact me here: https://twitter.com/Acerola_t or [Discord](https://discord.gg/FxGQvbfm6Y)
