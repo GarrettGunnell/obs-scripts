@@ -11,7 +11,7 @@ DEBUG_AUDIO = False
 WINDOW_WIDTH = 0
 WINDOW_HEIGHT = 0
 
-BLEND_SPEED = 0.08
+BLEND_SPEED = 2
 
 def lerp(a, b, t):
     return (1 - t) * a + t * b
@@ -55,6 +55,7 @@ class PNGTuber:
     is_yelling = False
     tick_acc = 0.0
     animation_settings = None
+    previous_frame_time = time.time()
 
     def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell, idle_delay, origin, sceneitem, animation_settings):
         self.source = source
@@ -70,6 +71,9 @@ class PNGTuber:
         self.origin = origin
         self.sceneitem = sceneitem
         self.animation_settings = animation_settings
+
+    def get_delta_time(self):
+        return time.time() - self.previous_frame_time
 
     def idle(self):
         if self.is_idle:
@@ -89,7 +93,7 @@ class PNGTuber:
         
         if self.is_talking:
             if self.tick_acc < 1:
-                self.tick_acc += BLEND_SPEED
+                self.tick_acc += self.get_delta_time() * BLEND_SPEED
             return
         
         if DEBUG: print("Talking")
@@ -102,7 +106,7 @@ class PNGTuber:
     def yelling(self):
         if self.is_yelling:
             if self.tick_acc < 1:
-                self.tick_acc += BLEND_SPEED
+                self.tick_acc += self.get_delta_time() * BLEND_SPEED
             return
         
         if DEBUG: print("Yelling")
@@ -169,7 +173,9 @@ class PNGTuber:
         
         return offset
 
-
+    def easing(self):
+        x = max(0, min(1, self.tick_acc))
+        return x * x
 
     def update(self, volume):
         if self.is_paused or self.sceneitem is None: return
@@ -179,10 +185,12 @@ class PNGTuber:
         elif (volume > self.talking_threshold): self.talking()
         else: 
             if self.tick_acc > 0:
-                self.tick_acc -= BLEND_SPEED
+                self.tick_acc -= self.get_delta_time() * BLEND_SPEED
                 
             if self.tick_acc < 0.2:
                 self.idle()
+
+        self.previous_frame_time = time.time()
 
         talking_offset = talking_offset = self.calculate_offset(self.animation_settings.talk_animation, self.animation_settings.talk_amplitude, self.animation_settings.talk_frequency)
         if self.is_yelling and self.talking_image != self.yelling_image:
@@ -198,8 +206,8 @@ class PNGTuber:
         talking_position.y = self.origin.y - talking_offset.y
 
         new_position = obs.vec2()
-        new_position.x = lerp(idle_position.x, talking_position.x, self.tick_acc)
-        new_position.y = lerp(idle_position.y, talking_position.y, self.tick_acc)
+        new_position.x = lerp(idle_position.x, talking_position.x, self.easing())
+        new_position.y = lerp(idle_position.y, talking_position.y, self.easing())
         obs.obs_sceneitem_set_pos(self.sceneitem, new_position)
 
     def pause(self):
