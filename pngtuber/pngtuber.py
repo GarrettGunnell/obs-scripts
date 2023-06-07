@@ -24,7 +24,7 @@ class Volmeter(Structure):
     pass
 
 class AnimationSettings:
-    def __init__(self, idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency, blink_timer, blink_length):
+    def __init__(self, idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency, blink_timer, blink_length, easing_function, blend_speed):
         self.idle_animation = idle_animation
         self.idle_amplitude = idle_amplitude
         self.idle_frequency = idle_frequency
@@ -36,6 +36,8 @@ class AnimationSettings:
         self.yell_frequency = yell_frequency
         self.blink_timer = blink_timer
         self.blink_length = blink_length
+        self.easing_function = easing_function
+        self.blend_speed = blend_speed
 
 class SpriteSettings:
     def __init__(self, idle_blink_image, talk_image, talk_blink_image, yell_image, yell_blink_image):
@@ -344,6 +346,7 @@ def script_defaults(settings):
     obs.obs_data_set_default_double(settings, "talk frequency", 1.0)
     obs.obs_data_set_default_double(settings, "yell amplitude", 1.0)
     obs.obs_data_set_default_double(settings, "yell frequency", 1.0)
+    obs.obs_data_set_default_double(settings, "blend speed", 1.0)
 
 
 # Callbacks
@@ -470,6 +473,21 @@ def script_properties():
     blink_length = obs.obs_properties_add_float_slider(properties, "blink length", "Blink Length", 0.01, 1, 0.01)
     obs.obs_property_set_long_description(blink_length, "The average time it takes for a human adult to complete a blink is 0.3 seconds.")
 
+    easing_function_list = obs.obs_properties_add_list(
+        properties,
+        "easing function",
+        "Easing Function:",
+        obs.OBS_COMBO_TYPE_LIST,
+        obs.OBS_COMBO_FORMAT_STRING,
+    )
+
+    easing_functions_list = ["Linear", "easeInQuad", "easeOutQuad", "easeInOutQuad", "easeInElastic", "easeOutElastic", "easeInOutElastic", "easeInBounce"]
+    for item in easing_functions_list:
+        obs.obs_property_list_add_string(easing_function_list, item, item)
+
+    blend_speed = obs.obs_properties_add_float_slider(properties, "blend speed", "Blend Speed", 0.01, 3, 0.01)
+    obs.obs_property_set_long_description(blend_speed, "How quickly to transition between animation states.")
+
     obs.obs_properties_add_button(properties, "pause button", "Pause PNGTuber", stop_pngtuber)
     obs.obs_properties_add_button(properties, "play button", "Play PNGTuber", play_pngtuber)
 
@@ -520,8 +538,10 @@ def script_update(settings):
     yell_frequency = obs.obs_data_get_double(settings, "yell frequency")
     blink_timer = obs.obs_data_get_double(settings, "blink timer")
     blink_length = obs.obs_data_get_double(settings, "blink length")
+    easing_function = obs.obs_data_get_string(settings, "easing function")
+    blend_speed = obs.obs_data_get_double(settings, "blend speed")
 
-    animation_settings = AnimationSettings(idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency, blink_timer, blink_length)
+    animation_settings = AnimationSettings(idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency, blink_timer, blink_length, easing_function, blend_speed)
     sprite_settings = SpriteSettings(idle_blink_image_path, talking_image_path, talking_blink_image_path, yelling_image_path, yelling_blink_image_path)
 
     # Get screen dimensions

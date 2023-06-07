@@ -11,8 +11,10 @@ If you have issues please contact me here: https://twitter.com/Acerola_t or [Dis
 ## Scripts
 
 * [**PNGTuber State Machine**](https://github.com/GarrettGunnell/obs-scripts/tree/main/pngtuber) *(Windows Only)*
-* * Animate your PNGTuber by swapping between sprites based on your mic volume.
+* * Animate your PNGTuber by swapping between sprites based on your mic volume as well as optional blinking sprites to bring your PNGTuber to life.
+* * Customize how your PNGTuber moves during different states with different animation options.
 * * * [Video Example](https://www.youtube.com/watch?v=G2TArVrOumQ&ab_channel=Acerola)
+* * * [Video Tutorial]()
 
 # How To Use
 
