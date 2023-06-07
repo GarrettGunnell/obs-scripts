@@ -51,6 +51,9 @@ class PNGTuber:
     is_yelling = False
     tick_acc = 0.0
     previous_frame_time = time.time()
+    is_blinking = False
+    blink_timer = 0.0
+    blinking_timer = 0.0
 
     def __init__(self, source, sprite_settings, talk_threshold, yell_threshold, hold_yell, idle_delay, origin, sceneitem, animation_settings):
         self.source = source
@@ -62,7 +65,7 @@ class PNGTuber:
         self.talking_blink_image = sprite_settings.talk_blink_image
         self.talking_threshold = talk_threshold
         self.yelling_image = sprite_settings.yell_image
-        self.yelling_blinking_image = sprite_settings.yell_blink_image
+        self.yelling_blink_image = sprite_settings.yell_blink_image
         self.yelling_threshold = yell_threshold
         self.hold_yell = hold_yell
         self.idle_delay = idle_delay
@@ -74,14 +77,11 @@ class PNGTuber:
         return time.time() - self.previous_frame_time
 
     def idle(self):
-        if self.is_idle:
-            return
-        
         if DEBUG: print("Idle")
         self.is_idle = True
         self.is_talking = False
         self.is_yelling = False
-        obs.obs_data_set_string(self.settings, "file", self.idle_image)
+        obs.obs_data_set_string(self.settings, "file", self.idle_blink_image if self.is_blinking else self.idle_image)
         obs.obs_source_update(self.source, self.settings);
 
     def talking(self):
@@ -89,30 +89,27 @@ class PNGTuber:
             self.yelling()
             return 
         
-        if self.is_talking:
-            if self.tick_acc < 1:
-                self.tick_acc += self.get_delta_time() * BLEND_SPEED
-            return
+        if self.tick_acc < 1:
+            self.tick_acc += self.get_delta_time() * BLEND_SPEED
         
         if DEBUG: print("Talking")
         self.is_idle = False
         self.is_talking = True
         self.is_yelling = False
-        obs.obs_data_set_string(self.settings, "file", self.talking_image)
+        obs.obs_data_set_string(self.settings, "file", self.talking_blink_image if self.is_blinking else self.talking_image)
         obs.obs_source_update(self.source, self.settings);
     
     def yelling(self):
-        if self.is_yelling:
-            if self.tick_acc < 1:
-                self.tick_acc += self.get_delta_time() * BLEND_SPEED
-            return
-        
+        if self.tick_acc < 1:
+            self.tick_acc += self.get_delta_time() * BLEND_SPEED
+            
         if DEBUG: print("Yelling")
         self.is_idle = False
         self.is_talking = False
         self.is_yelling = True
-        obs.obs_data_set_string(self.settings, "file", self.yelling_image)
-        obs.obs_source_update(self.source, self.settings);
+        obs.obs_data_set_string(self.settings, "file", self.yelling_blink_image if self.is_blinking else self.yelling_image)
+        obs.obs_source_update(self.source, self.settings)
+
     
     def get_animation_type(self):
         if self.is_idle: return self.animation_settings.idle_animation
@@ -225,6 +222,7 @@ class PNGTuber:
         obs.obs_sceneitem_get_pos(self.sceneitem, self.origin)
 
     def release(self):
+        self.is_blinking = False
         self.idle()
         obs.obs_data_release(self.settings)
         obs.obs_source_release(self.source)
