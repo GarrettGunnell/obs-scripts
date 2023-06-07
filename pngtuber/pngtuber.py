@@ -11,6 +11,10 @@ DEBUG_AUDIO = False
 WINDOW_WIDTH = 0
 WINDOW_HEIGHT = 0
 
+BLEND_SPEED = 0.08
+
+def lerp(a, b, t):
+    return (1 - t) * a + t * b
 
 # Classes
 class Source(Structure):
@@ -18,6 +22,29 @@ class Source(Structure):
 
 class Volmeter(Structure):
     pass
+
+class AnimationSettings:
+    idle_animation = "None"
+    idle_amplitude = 0
+    idle_frequency = 0
+    talk_animation = "None"
+    talk_amplitude = 0
+    talk_frequency = 0
+    yell_animation = "None"
+    yell_amplitude = 0
+    yell_frequency = 0
+
+    def __init__(self, idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency):
+        self.idle_animation = idle_animation
+        self.idle_amplitude = idle_amplitude
+        self.idle_frequency = idle_frequency
+        self.talk_animation = talk_animation
+        self.talk_amplitude = talk_amplitude
+        self.talk_frequency = talk_frequency
+        self.yell_animation = yell_animation
+        self.yell_amplitude = yell_amplitude
+        self.yell_frequency = yell_frequency
+
 
 class PNGTuber:
     origin = obs.vec2()
@@ -27,8 +54,9 @@ class PNGTuber:
     is_talking = False
     is_yelling = False
     tick_acc = 0.0
+    animation_settings = None
 
-    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell, idle_delay, origin, sceneitem):
+    def __init__(self, source, talk_image, talk_threshold, yell_image, yell_threshold, hold_yell, idle_delay, origin, sceneitem, animation_settings):
         self.source = source
         self.settings = obs.obs_source_get_settings(source)
 
@@ -41,6 +69,7 @@ class PNGTuber:
         self.idle_delay = idle_delay
         self.origin = origin
         self.sceneitem = sceneitem
+        self.animation_settings = animation_settings
 
     def idle(self):
         if self.is_idle:
@@ -54,12 +83,13 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
 
     def talking(self):
-        self.tick_acc = 0.0
         if self.hold_yell and self.is_yelling:
             self.yelling()
             return 
         
         if self.is_talking:
+            if self.tick_acc < 1:
+                self.tick_acc += BLEND_SPEED
             return
         
         if DEBUG: print("Talking")
@@ -70,8 +100,9 @@ class PNGTuber:
         obs.obs_source_update(self.source, self.settings);
     
     def yelling(self):
-        self.tick_acc = 0.0
         if self.is_yelling:
+            if self.tick_acc < 1:
+                self.tick_acc += BLEND_SPEED
             return
         
         if DEBUG: print("Yelling")
@@ -80,55 +111,95 @@ class PNGTuber:
         self.is_yelling = True
         obs.obs_data_set_string(self.settings, "file", self.yelling_image)
         obs.obs_source_update(self.source, self.settings);
+    
+    def get_animation_type(self):
+        if self.is_idle: return self.animation_settings.idle_animation
+        if self.is_talking: return self.animation_settings.talk_animation
+        if self.is_yelling: return self.animation_settings.yell_animation
+
+        return "None"
+
+    def get_amplitude(self):
+        if self.is_idle: return self.animation_settings.idle_amplitude
+        if self.is_talking: return self.animation_settings.talk_amplitude
+        if self.is_yelling: return self.animation_settings.yell_amplitude
+
+        return 0
+
+    def get_frequency(self):
+        if self.is_idle: return self.animation_settings.idle_frequency
+        if self.is_talking: return self.animation_settings.talk_frequency
+        if self.is_yelling: return self.animation_settings.yell_frequency
+        
+        return 0
+
+    def calculate_offset(self, animation_type, amplitude, frequency):
+        offset = obs.vec2()
+        offset.x = 0
+        offset.y = 0
+
+        t = time.time() * math.pi * frequency
+
+        if animation_type == "None": return offset
+        if animation_type == "Shake":
+            g = 0.5
+            f = frequency
+            a = amplitude
+            for i in range(0, 3):
+                v = math.cos(time.time() * f + i * 0.35) * a
+                offset.x += v
+                f *= 2
+                a *= g
+
+            g = 0.5
+            f = frequency
+            a = amplitude
+            for i in range(0, 3):
+                v = math.sin(time.time() * f + i * 0.35) * a
+                offset.y += v
+                f *= 2
+                a *= g
+        if animation_type == "Vertical Bounce":
+            offset.x = 0
+            offset.y = abs(math.cos(t) * amplitude)
+        if animation_type == "Horizontal Bounce":
+            offset.x = (math.sin(t) * amplitude)
+            offset.y = abs(math.cos(t) * amplitude)
+
+        
+        return offset
+
 
 
     def update(self, volume):
         if self.is_paused or self.sceneitem is None: return
         
+        # Update sprite
         if   (volume > self.yelling_threshold): self.yelling()
         elif (volume > self.talking_threshold): self.talking()
         else: 
-            self.tick_acc += 0.016
-            if self.tick_acc > self.idle_delay:
-                self.tick_acc = 0.0
+            if self.tick_acc > 0:
+                self.tick_acc -= BLEND_SPEED
+                
+            if self.tick_acc < 0.2:
                 self.idle()
 
-        offset = obs.vec2()
+        talking_offset = talking_offset = self.calculate_offset(self.animation_settings.talk_animation, self.animation_settings.talk_amplitude, self.animation_settings.talk_frequency)
+        if self.is_yelling and self.talking_image != self.yelling_image:
+            talking_offset = self.calculate_offset(self.animation_settings.yell_animation, self.animation_settings.yell_amplitude, self.animation_settings.yell_frequency)
+        idle_offset = self.calculate_offset(self.animation_settings.idle_animation, self.animation_settings.idle_amplitude, self.animation_settings.idle_frequency)
         
-        t = time.time() * math.pi * idle_animation_frequency
+        idle_position = obs.vec2()
+        idle_position.x = self.origin.x - idle_offset.x
+        idle_position.y = self.origin.y - idle_offset.y
 
-        ''' up and down bounce animation
-        offset.x = 0
-        offset.y = abs(math.cos(t) * idle_animation_amplitude)
-        '''
-
-        #offset.x = (math.sin(t) * idle_animation_amplitude)
-        #offset.y = abs(math.cos(t) * idle_animation_amplitude)
-
-        offset.x = 0
-        offset.y = 0
-
-        g = 0.5
-        f = idle_animation_frequency
-        a = idle_animation_amplitude
-        for i in range(0, 3):
-            v = math.cos(time.time() * f + i * 0.35) * a
-            offset.x += v
-            f *= 2
-            a *= g
-
-        g = 0.5
-        f = idle_animation_frequency
-        a = idle_animation_amplitude
-        for i in range(0, 3):
-            v = math.sin(time.time() * f + i * 0.35) * a
-            offset.y += v
-            f *= 2
-            a *= g
+        talking_position = obs.vec2()
+        talking_position.x = self.origin.x - talking_offset.x
+        talking_position.y = self.origin.y - talking_offset.y
 
         new_position = obs.vec2()
-        new_position.x = self.origin.x - offset.x
-        new_position.y = self.origin.y - offset.y
+        new_position.x = lerp(idle_position.x, talking_position.x, self.tick_acc)
+        new_position.y = lerp(idle_position.y, talking_position.y, self.tick_acc)
         obs.obs_sceneitem_set_pos(self.sceneitem, new_position)
 
     def pause(self):
@@ -224,8 +295,6 @@ cached_sceneitem = None
 cached_origin = obs.vec2()
 cached_origin.x = 0
 cached_origin.y = 0
-idle_animation_amplitude = 0.0
-idle_animation_frequency = 0.0
 
 
 # Description displayed in the Scripts dialog window
@@ -307,18 +376,18 @@ def script_properties():
 
     idle_motion_list = obs.obs_properties_add_list(
         properties,
-        "idle motion",
+        "idle animation",
         "Idle Motion:",
         obs.OBS_COMBO_TYPE_LIST,
         obs.OBS_COMBO_FORMAT_STRING,
     )
 
-    animations_list = ["None", "Shake", "Vertical Bounce", "Horizontal Bounce", "Roll"]
+    animations_list = ["None", "Shake", "Vertical Bounce", "Horizontal Bounce"]
     for item in animations_list:
         obs.obs_property_list_add_string(idle_motion_list, item, item)
 
-    obs.obs_properties_add_float_slider(properties, "idle animation amplitude", "Animation Strength", 0.0, 100.0, 0.01)
-    obs.obs_properties_add_float_slider(properties, "idle animation frequency", "Animation Speed", 0.0, 10.0, 0.01)
+    obs.obs_properties_add_float_slider(properties, "idle amplitude", "Animation Strength", 0.0, 100.0, 0.01)
+    obs.obs_properties_add_float_slider(properties, "idle frequency", "Animation Speed", 0.0, 10.0, 0.01)
 
 
     obs.obs_properties_add_float_slider(properties, "talking threshold", "Talking Threshold", -60.0, 0.0, 0.01)
@@ -327,7 +396,7 @@ def script_properties():
 
     talk_motion_list = obs.obs_properties_add_list(
         properties,
-        "talk motion",
+        "talk animation",
         "Talk Motion:",
         obs.OBS_COMBO_TYPE_LIST,
         obs.OBS_COMBO_FORMAT_STRING,
@@ -335,6 +404,9 @@ def script_properties():
     
     for item in animations_list:
         obs.obs_property_list_add_string(talk_motion_list, item, item)
+    
+    obs.obs_properties_add_float_slider(properties, "talk amplitude", "Animation Strength", 0.0, 100.0, 0.01)
+    obs.obs_properties_add_float_slider(properties, "talk frequency", "Animation Speed", 0.0, 10.0, 0.01)
 
     ygate = obs.obs_properties_add_bool(properties, "use yell gate", "Use Yell Gate?")
     obs.obs_property_set_long_description(ygate, "Use this gate to transition to a different sprite when input volume exceeds the following threshold")
@@ -345,7 +417,7 @@ def script_properties():
 
     yell_motion_list = obs.obs_properties_add_list(
         properties,
-        "yell motion",
+        "yell animation",
         "Yell Motion:",
         obs.OBS_COMBO_TYPE_LIST,
         obs.OBS_COMBO_FORMAT_STRING,
@@ -353,6 +425,9 @@ def script_properties():
     
     for item in animations_list:
         obs.obs_property_list_add_string(yell_motion_list, item, item)
+
+    obs.obs_properties_add_float_slider(properties, "yell amplitude", "Animation Strength", 0.0, 100.0, 0.01)
+    obs.obs_properties_add_float_slider(properties, "yell frequency", "Animation Speed", 0.0, 10.0, 0.01)
 
     hold_yell_b = obs.obs_properties_add_bool(properties, "hold yell", "Hold Yell?")
     obs.obs_property_set_long_description(hold_yell_b, "Usually you'll only be above the yell threshold for a brief period, enable this if you want to keep the yelling sprite regardless of future audio levels until you stop talking.")
@@ -368,7 +443,7 @@ def script_properties():
 
 # Cache GUI Parameters
 def script_update(settings):
-    global pngtuber, audio_source, cached_scene_source, cached_sceneitem, cached_origin, idle_animation_amplitude, idle_animation_frequency
+    global pngtuber, audio_source, cached_scene_source, cached_sceneitem, cached_origin
 
     if G.lock:
         remove_volmeter()
@@ -394,8 +469,17 @@ def script_update(settings):
     yelling_threshold = obs.obs_data_get_double(settings, "yelling threshold")
     hold_yelling = obs.obs_data_get_bool(settings, "hold yell")
     idle_delay = obs.obs_data_get_double(settings, "idle delay")
-    idle_animation_amplitude = obs.obs_data_get_double(settings, "idle animation amplitude") * 10
-    idle_animation_frequency = obs.obs_data_get_double(settings, "idle animation frequency")
+    idle_animation = obs.obs_data_get_string(settings, "idle animation")
+    idle_amplitude = obs.obs_data_get_double(settings, "idle amplitude") * 10
+    idle_frequency = obs.obs_data_get_double(settings, "idle frequency")
+    talk_animation = obs.obs_data_get_string(settings, "talk animation")
+    talk_amplitude = obs.obs_data_get_double(settings, "talk amplitude") * 10
+    talk_frequency = obs.obs_data_get_double(settings, "talk frequency")
+    yell_animation = obs.obs_data_get_string(settings, "yell animation")
+    yell_amplitude = obs.obs_data_get_double(settings, "yell amplitude") * 10
+    yell_frequency = obs.obs_data_get_double(settings, "yell frequency")
+
+    animation_settings = AnimationSettings(idle_animation, idle_amplitude, idle_frequency, talk_animation, talk_amplitude, talk_frequency, yell_animation, yell_amplitude, yell_frequency)
 
 
     # Get screen dimensions
@@ -423,7 +507,7 @@ def script_update(settings):
         print("Please select an image for yelling.")
         return
 
-    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay, cached_origin, cached_sceneitem)
+    pngtuber = PNGTuber(obs.obs_get_source_by_name(pngtuber_source), talking_image_path, talking_threshold, yelling_image_path, yelling_threshold, hold_yelling, idle_delay, cached_origin, cached_sceneitem, animation_settings)
 
 
 # Update (Called once per frame)
